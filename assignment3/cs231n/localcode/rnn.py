@@ -3,9 +3,15 @@
 # @Time :2023/4/18 15:00
 # @Author :Xiaofeng
 import numpy as np
+from matplotlib import pyplot as plt
 
+from assignment3.cs231n.captioning_solver import CaptioningSolver
+from assignment3.cs231n.classifiers.rnn import CaptioningRNN
+from assignment3.cs231n.coco_utils import load_coco_data
 from assignment3.cs231n.data_utils import rel_error
 from assignment3.cs231n.rnn_layers import rnn_forward
+
+data = load_coco_data(pca_features=True)
 
 
 def test_forward():
@@ -31,5 +37,70 @@ def test_forward():
     print('h error: ', rel_error(expected_h, h))
 
 
+def test_rnn():
+    N, D, W, H = 10, 20, 30, 40
+    word_to_idx = {'<NULL>': 0, 'cat': 2, 'dog': 3}
+    V = len(word_to_idx)
+    T = 13
+
+    model = CaptioningRNN(
+        word_to_idx,
+        input_dim=D,
+        wordvec_dim=W,
+        hidden_dim=H,
+        cell_type='rnn',
+        dtype=np.float64
+    )
+
+    # Set all model parameters to fixed values
+    for k, v in model.params.items():
+        model.params[k] = np.linspace(-1.4, 1.3, num=v.size).reshape(*v.shape)
+
+    features = np.linspace(-1.5, 0.3, num=(N * D)).reshape(N, D)
+    captions = (np.arange(N * T) % V).reshape(N, T)
+
+    loss, grads = model.loss(features, captions)
+    expected_loss = 9.83235591003
+
+    print('loss: ', loss)
+    print('expected loss: ', expected_loss)
+    print('difference: ', abs(loss - expected_loss))
+
+
+def overfit_smalldata_rnn():
+    np.random.seed(231)
+
+    small_data = load_coco_data(max_train=50)
+
+    small_rnn_model = CaptioningRNN(
+        cell_type='rnn',
+        word_to_idx=data['word_to_idx'],
+        input_dim=data['train_features'].shape[1],
+        hidden_dim=512,
+        wordvec_dim=256,
+    )
+
+    small_rnn_solver = CaptioningSolver(
+        small_rnn_model, small_data,
+        update_rule='adam',
+        num_epochs=50,
+        batch_size=25,
+        optim_config={
+            'learning_rate': 5e-3,
+        },
+        lr_decay=0.95,
+        verbose=True, print_every=10,
+    )
+
+    small_rnn_solver.train()
+
+    # Plot the training losses.
+    plt.plot(small_rnn_solver.loss_history)
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.title('Training loss history')
+    plt.show()
+
+
 if __name__ == '__main__':
-    test_forward()
+    overfit_smalldata_rnn()
