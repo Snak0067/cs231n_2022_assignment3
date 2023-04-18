@@ -159,7 +159,7 @@ class CaptioningRNN:
         elif self.cell_type == 'lstm':
             h, cache_rnn = lstm_forward(x, h0, Wx, Wh, b)
         else:
-            raise ValueError('%s not implemented' % (self.cell_type))
+            raise ValueError('%s not implemented' % self.cell_type)
 
         # step 4
         scores, cache_scores = temporal_affine_forward(h, W_vocab, b_vocab)
