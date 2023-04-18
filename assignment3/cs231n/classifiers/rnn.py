@@ -105,11 +105,10 @@ class CaptioningRNN:
         # You'll need this
         mask = captions_out != self._null
 
-        # Weight and bias for the affine transform from image features to initial
-        # hidden state
+        # 从图像特征到初始隐藏状态(h0)的仿射变换的权重和偏差
         W_proj, b_proj = self.params["W_proj"], self.params["b_proj"]
 
-        # Word embedding matrix
+        # 词嵌入矩阵
         W_embed = self.params["W_embed"]
 
         # Input-to-hidden, hidden-to-hidden, and biases for the RNN
@@ -148,7 +147,47 @@ class CaptioningRNN:
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # step 1
+        h0 = np.dot(features, W_proj) + b_proj
+
+        # step 2
+        x, cache_embedding = word_embedding_forward(captions_in, W_embed)
+
+        # step 3
+        if self.cell_type == 'rnn':
+            h, cache_rnn = rnn_forward(x, h0, Wx, Wh, b)
+        elif self.cell_type == 'lstm':
+            h, cache_rnn = lstm_forward(x, h0, Wx, Wh, b)
+        else:
+            raise ValueError('%s not implemented' % (self.cell_type))
+
+        # step 4
+        scores, cache_scores = temporal_affine_forward(h, W_vocab, b_vocab)
+        # step 5
+        loss, dscores = temporal_softmax_loss(scores, captions_out, mask, verbose=False)
+        # Backward pass
+        grads = dict.fromkeys(self.params)
+        # Backward into step 4
+        dh, dW_vocab, db_vocab = temporal_affine_backward(dscores, cache_scores)
+        # Backward into step 4
+        if self.cell_type == 'rnn':
+            dx, dh0, dWx, dWh, db = rnn_backward(dh, cache_rnn)
+        # Backward into step 2
+        dW_embed = word_embedding_backward(dx, cache_embedding)
+
+        # Backward into step 1
+        dW_proj = np.dot(features.T, dh0)
+        db_proj = np.sum(dh0, axis=0)
+
+        # Gather everythhing in the dict
+        grads['W_proj'] = dW_proj
+        grads['b_proj'] = db_proj
+        grads['W_embed'] = dW_embed
+        grads['Wx'] = dWx
+        grads['Wh'] = dWh
+        grads['b'] = db
+        grads['W_vocab'] = dW_vocab
+        grads['b_vocab'] = db_vocab
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
